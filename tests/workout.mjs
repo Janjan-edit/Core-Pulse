@@ -1,0 +1,73 @@
+﻿import assert from 'node:assert/strict';
+import { JSDOM } from 'jsdom';
+import { createServer } from 'vite';
+import React, { act } from 'react';
+import { createRoot } from 'react-dom/client';
+const dom = new JSDOM('<div id="root"></div><input id="exerciseName"><select id="exerciseSelect"></select><input id="exSets" value="2"><input id="exWork" value="5"><input id="exShortRest" value="5"><input id="exLongRest" value="10">',{url:'http://localhost',pretendToBeVisual:true});
+for(const key of ['window','document','localStorage','HTMLElement']) globalThis[key]=dom.window[key];
+Object.defineProperty(globalThis,'navigator',{value:dom.window.navigator,configurable:true});
+globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+dom.window.HTMLElement.prototype.scrollIntoView=()=>{};
+let now=0, nextFrame=0; const frames=new Map();
+Object.defineProperty(performance,'now',{value:()=>now,configurable:true});
+globalThis.requestAnimationFrame=callback=>{frames.set(++nextFrame,callback);return nextFrame;};
+globalThis.cancelAnimationFrame=id=>frames.delete(id);
+const server=await createServer({server:{middlewareMode:true},appType:'custom'});
+const root=createRoot(document.getElementById('root'));
+try {
+ const storage=await server.ssrLoadModule('/src/storage.ts');
+ assert.deepEqual(storage.readStored('missing',[],storage.validQueue),[]);
+ localStorage.setItem('broken','{bad'); assert.deepEqual(storage.readStored('broken',[],storage.validQueue),[]);
+ assert.throws(()=>storage.parseBackup('{"version":1,"routines":[{"name":"bad"}]}'));
+ const {useWorkout}=await server.ssrLoadModule('/src/useWorkout.ts');
+ let api;
+ function Harness(){ api=useWorkout(); return null; }
+ await act(async()=>root.render(React.createElement(Harness)));
+ const change=async callback=>{await act(async()=>callback());};
+ await change(()=>api.setExercise('Push-ups'));
+ await change(()=>api.addExerciseToQueue());
+ assert.equal(api.queue.length,1); assert.equal(api.queue[0].sets,2);
+ assert.equal(JSON.parse(localStorage.getItem('corepulse.queue')).length,1);
+ await change(()=>api.setExercise('Squats')); await change(()=>api.addExerciseToQueue());
+ await change(()=>api.moveExercise(1,-1)); assert.equal(api.queue[0].name,'Squats');
+ await change(()=>api.editExercise(api.queue[0].id)); assert.equal(api.customName,'Squats');
+ document.getElementById('exSets').value='3';
+ await change(()=>api.addExerciseToQueue()); assert.equal(api.queue.length,2); assert.equal(api.queue[0].sets,3);
+ await change(()=>api.setRoutineName('Morning'));
+ await change(()=>api.saveRoutine()); assert.equal(api.routines.length,1);
+ const backup=JSON.stringify({version:1,routines:api.routines});
+ const imported=storage.parseBackup(backup); assert.equal(imported[0].name,'Morning'); assert.notEqual(imported[0].id,api.routines[0].id);
+ const invalid=JSON.parse(backup); invalid.routines[0].exercises[0].work=-5; assert.throws(()=>storage.parseBackup(JSON.stringify(invalid)));
+ await change(()=>api.clearQueue()); await change(()=>api.loadRoutine(api.routines[0].id)); assert.equal(api.queue.length,2);
+ await change(()=>api.setSettings({...api.settings,sound:false,preparation:3}));
+ await change(()=>api.startWorkout()); assert.equal(api.phase,'prepare'); assert.equal(api.remaining,3);
+ async function advance(ms) {now+=ms; const pending=[...frames.values()];frames.clear();await act(async()=>pending.forEach(cb=>cb(now)));}
+ await advance(3001);assert.equal(api.phase,'work'); assert.equal(api.remaining,5);
+ await advance(1000); await change(()=>api.togglePause());const frozen=api.remaining;
+ await advance(10000); assert.equal(api.remaining,frozen);
+ await change(()=>api.togglePause()); await advance(4001); assert.equal(api.phase,'short');
+ await change(()=>api.stopWorkout()); assert.equal(api.active,false); await advance(10000);assert.equal(api.phase,'idle'); assert.equal(api.history.length,0);
+ await change(()=>api.startWorkout()); await change(()=>api.skipPhase());
+ for(let i=0; i<20 && api.active; i++) await change(()=>api.skipPhase());
+ assert.equal(api.complete,true); assert.equal(api.history.length,1);assert.equal(api.history[0].skipped,true);
+ assert.equal(JSON.parse(localStorage.getItem('corepulse.history')).length,1);
+ await change(()=>api.returnToSetup());
+ // Remount reads the persisted queue, routines, settings, and history.
+ await act(async()=>root.render(null)); await act(async()=>root.render(React.createElement(Harness)));
+ assert.equal(api.queue.length,2);assert.equal(api.routines.length,1);assert.equal(api.history.length,1);assert.equal(api.settings.preparation,3);
+ // A naturally completed session is recorded without a skipped marker.
+ await change(()=>api.clearQueue());
+ document.getElementById('exSets').value='1';
+ await change(()=>api.setExercise('Plank')); await change(()=>api.addExerciseToQueue());
+ await change(()=>api.setSettings({...api.settings,preparation:0}));
+ await change(()=>api.startWorkout()); await advance(5001);
+ assert.equal(api.complete,true); assert.equal(api.history.length,2); assert.equal(api.history[0].skipped,false);
+ await change(()=>api.returnToSetup());
+ await change(()=>api.loadRoutine(api.routines[0].id));
+ await act(async()=>root.render(null));
+ const App=(await server.ssrLoadModule('/src/App.tsx')).default;
+ await act(async()=>root.render(React.createElement(App)));
+ assert.match(document.body.textContent,/Your routines/);assert.match(document.body.textContent,/Morning/);assert.match(document.body.textContent,/Workout settings/);
+ assert.equal(document.querySelectorAll('.queue-actions').length,2);
+ console.log('Passed: storage recovery, validation, editing, reordering, routines, backup validation, countdown, pause/resume, stop, history, persistence, and React rendering.');
+} finally {await act(async()=>root.unmount());await server.close();dom.window.close();}
