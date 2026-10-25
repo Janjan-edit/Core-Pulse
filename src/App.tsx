@@ -1,7 +1,11 @@
+import { BuilderExtras, Preview, Preferences, WeeklyProgress, CompletionExtras, ShareInvitation } from './WorkoutFeatures';
+import NumberStepper from './NumberStepper';
 import { useWorkout, fmt } from './useWorkout';
 export default function App() {
- const { hadSkippedPhases, routines, history, settings, setSettings, storageError, editingId, routineName, setRoutineName, fullscreen, editExercise, cancelEdit, moveExercise, saveRoutine, loadRoutine, deleteRoutine, exportRoutines, importRoutines, toggleFullscreen, nextAction, queue, preset, exercise, setExercise, customName, setCustomName, phase, phaseText, badgeText, active, complete, paused, exIdx, setIdx, current, remaining, duration, progress, totalSeconds, totalSets, elapsed, toast, addExerciseToQueue, removeFromQueue, clearQueue, applyPreset, startWorkout, togglePause, skipPhase, stopWorkout, returnToSetup } = useWorkout();
+ const w = useWorkout();
+ const { hadSkippedPhases, routines, history, settings, setSettings, storageError, editingId, routineName, setRoutineName, fullscreen, editExercise, cancelEdit, moveExercise, saveRoutine, loadRoutine, deleteRoutine, exportRoutines, importRoutines, toggleFullscreen, nextAction, queue, preset, exercise, setExercise, customName, setCustomName, phase, phaseText, badgeText, active, complete, paused, exIdx, setIdx, current, remaining, duration, progress, totalSeconds, totalSets, elapsed, toast, addExerciseToQueue, removeFromQueue, clearQueue, applyPreset, startWorkout, togglePause, skipPhase, stopWorkout, returnToSetup } = w;
  return <>
+ <ShareInvitation w={w}/>
 
   
   <div className="bg-orb bg-orb-1"></div>
@@ -103,15 +107,15 @@ export default function App() {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
               Sets
             </label>
-            <input type="number" id="exSets" defaultValue="3" min="1" max="20" className="num-input" />
+            <NumberStepper id="exSets" label="Sets" defaultValue={3} min={1} max={20} />
           </div>
 
           <div className="form-group">
             <label className="field-label">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-              Work (sec)
+              {w.mode === "reps" ? "Estimated time per set (sec)" : "Work (sec)"}
             </label>
-            <input type="number" id="exWork" defaultValue="45" min="5" max="3600" className="num-input" />
+            <NumberStepper id="exWork" label="Work duration in seconds" defaultValue={45} min={5} max={3600} />
           </div>
 
           <div className="form-group">
@@ -120,7 +124,7 @@ export default function App() {
               Short Rest (sec)
               <span className="field-hint">between sets</span>
             </label>
-            <input type="number" id="exShortRest" defaultValue="30" min="5" max="600" className="num-input" />
+            <NumberStepper id="exShortRest" label="Short rest in seconds" defaultValue={30} min={0} max={600} />
           </div>
 
           <div className="form-group">
@@ -129,9 +133,10 @@ export default function App() {
               Long Rest (sec)
               <span className="field-hint">after exercise</span>
             </label>
-            <input type="number" id="exLongRest" defaultValue="90" min="10" max="600" className="num-input" />
+            <NumberStepper id="exLongRest" label="Long rest in seconds" defaultValue={90} min={0} max={600} />
           </div>
 
+          <div className="col-span-2"><BuilderExtras w={w}/></div>
           <div className="form-group col-span-2 form-group--add">
             <button className="btn-add" onClick={() => addExerciseToQueue()}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><path d="M12 8v8M8 12h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
@@ -165,10 +170,11 @@ export default function App() {
 
       
       <div className="queue-scroll-wrap" id="queueScrollWrap" style={{display: queue.length ? "block" : "none"}}>
-        <div className="queue-list" id="queueList">{queue.map((ex,i) => <div className="queue-item" key={ex.id}><div className="queue-num">{i+1}</div><div className="queue-info"><div className="queue-name">{ex.name}</div><div className="queue-tags"><span className="tag tag-sets">{ex.sets} sets</span><span className="tag tag-work">{ex.work}s work</span><span className="tag tag-short">{ex.shortRest}s short</span><span className="tag tag-long">{ex.longRest}s long</span><span className="tag tag-time">~{fmt(ex.sets*ex.work+(ex.sets-1)*ex.shortRest)}</span></div></div><div className="queue-actions"><button className="small-button" onClick={() => editExercise(ex.id)} disabled={!!editingId}>Edit</button><button className="small-button" onClick={() => moveExercise(i,-1)} disabled={i===0 || !!editingId} aria-label={`Move ${ex.name} up`}>↑</button><button className="small-button" onClick={() => moveExercise(i,1)} disabled={i===queue.length-1 || !!editingId} aria-label={`Move ${ex.name} down`}>↓</button><button className="queue-remove" disabled={!!editingId} onClick={() => removeFromQueue(i)} title="Remove exercise" aria-label={`Remove ${ex.name}`}>×</button></div></div>)}</div>
+        <div className="queue-list" id="queueList">{queue.map((ex,i) => <div className="queue-item" key={ex.id}><div className="queue-num">{i+1}</div><div className="queue-info"><div className="queue-name">{ex.name}</div><div className="queue-tags"><span className="tag tag-sets">{ex.sets} sets</span><span className="tag tag-work">{ex.mode === "reps" ? `${ex.reps} reps` : `${ex.work}s work`}</span>{ex.block && <span className="tag tag-sets">{ex.block} ? {ex.blockType ?? "standard"}{["circuit","superset"].includes(ex.blockType??"") ? ` ? ${ex.rounds??1} rounds` : ""}</span>}<span className="tag tag-short">{ex.shortRest}s short</span><span className="tag tag-long">{ex.longRest}s long</span><span className="tag tag-time">~{fmt(ex.sets*ex.work+(ex.sets-1)*ex.shortRest)}</span></div></div><div className="queue-actions"><button className="small-button" onClick={() => editExercise(ex.id)} disabled={!!editingId}>Edit</button><button className="small-button" onClick={() => moveExercise(i,-1)} disabled={i===0 || !!editingId} aria-label={`Move ${ex.name} up`}>↑</button><button className="small-button" onClick={() => moveExercise(i,1)} disabled={i===queue.length-1 || !!editingId} aria-label={`Move ${ex.name} down`}>↓</button><button className="queue-remove" disabled={!!editingId} onClick={() => removeFromQueue(i)} title="Remove exercise" aria-label={`Remove ${ex.name}`}>×</button></div></div>)}</div>
       </div>
 
       
+      {queue.length > 0 && <Preview w={w}/>}
       <button className="btn-start" id="btnStartWorkout" onClick={() => startWorkout()} disabled={!queue.length || !!editingId}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
         Start Workout
@@ -181,23 +187,32 @@ export default function App() {
         <div className="saved-list">{routines.length ? routines.map(r=><div className="saved-row" key={r.id}><div><strong>{r.name}</strong><span className="muted">{r.exercises.length} exercises</span></div><div className="inline-controls"><button className="small-button" onClick={()=>loadRoutine(r.id)} disabled={!!editingId}>Load</button><button className="small-button" onClick={()=>deleteRoutine(r.id)}>Delete</button></div></div>) : <p className="muted">Your first saved routine will appear here.</p>}</div>
         <div className="inline-controls"><button className="small-button" disabled={!routines.length} onClick={exportRoutines}>Export routines</button><label className="small-button file-button">Import backup<input type="file" accept="application/json,.json" onChange={e=>{void importRoutines(e.target.files?.[0]);e.target.value='';}}/></label></div>
       </section>
-      <section className="feature-card" aria-labelledby="settingsTitle"><h2 id="settingsTitle">Workout settings</h2><p className="muted">Install CorePulse from your browser?s app or Add to Home Screen menu. Offline use is available in the production app after the first visit.</p><div className="settings-grid">
+      <section className="feature-card" aria-labelledby="settingsTitle"><h2 id="settingsTitle">Workout settings</h2><p className="muted">Install CorePulse from your browser's app or Add to Home Screen menu. Offline use is available in the production app after the first visit.</p><div className="settings-grid">
         <label><input type="checkbox" checked={settings.sound} onChange={e=>setSettings({...settings,sound:e.target.checked})}/> Timer sounds</label>
         <label><input type="checkbox" checked={settings.voice} onChange={e=>setSettings({...settings,voice:e.target.checked})}/> Voice cues</label>
         <label><input type="checkbox" checked={settings.keepAwake} onChange={e=>setSettings({...settings,keepAwake:e.target.checked})}/> Keep screen awake when supported</label>
-        <label>Preparation countdown<select value={settings.preparation} onChange={e=>setSettings({...settings,preparation:Number(e.target.value)})}>{[0,3,5,10].map(n=><option key={n} value={n}>{n ? n+' seconds' : 'Off'}</option>)}</select></label>
-      </div></section>
-      <section className="feature-card" aria-labelledby="historyTitle"><h2 id="historyTitle">Recent workouts</h2><p className="muted">Last 100 finished sessions on this browser.</p>{history.length ? history.slice(0,10).map(session=><div className="saved-row" key={session.id}><div><strong>{new Date(session.date).toLocaleString()}</strong><span className="muted">{session.exercises} exercises · {session.sets} planned sets{session.skipped ? ' · Includes skipped phases' : ''}</span></div><span>{fmt(session.seconds)}</span></div>) : <p className="muted">Finish a workout to start your history.</p>}</section>
+        <label className="countdown-setting" htmlFor="preparationCountdown">
+          <span>Preparation countdown<span className="setting-hint">Time to get into position</span></span>
+          <span className="select-wrap settings-select">
+            <select id="preparationCountdown" value={settings.preparation} onChange={e=>setSettings({...settings,preparation:Number(e.target.value)})}>
+              {[0,3,5,10].map(n=><option key={n} value={n}>{n ? n+' seconds' : 'Off'}</option>)}
+            </select>
+            <svg className="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </span>
+        </label>
+      </div><Preferences w={w}/></section>
+      <WeeklyProgress w={w}/>
+      <section className="feature-card" aria-labelledby="historyTitle"><h2 id="historyTitle">Recent workouts</h2><p className="muted">Last 100 finished sessions on this browser.</p>{history.length ? history.slice(0,10).map(session=><div className="saved-row" key={session.id}><div><strong>{new Date(session.date).toLocaleString()}</strong><span className="muted">{session.exercises} exercises · {session.sets} planned sets{session.skipped ? ' · Includes skipped phases' : ''}</span></div>{session.feedback&&<span className="tag tag-work">{session.feedback}</span>}{session.note&&<p className="session-note">{session.note}</p>}<span>{fmt(session.seconds)}</span></div>) : <p className="muted">Finish a workout to start your history.</p>}</section>
     </div>
 
-    <div id="activePanel" style={{display: active ? "block" : "none"}}>
+    <div className={settings.compact ? "compact-workout" : ""} id="activePanel" style={{display: active ? "block" : "none"}}>
 
       
       <div className={`hero-card phase-${phase}`} id="heroCard">
 
         <button className="small-button fullscreen-button" onClick={()=>void toggleFullscreen()}>{fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</button>
         <h1 className="active-exercise">{current?.name}</h1>
-        <div className="hero-phase-label" id="heroPhaseLabel">{phaseText}</div>
+        <div className="hero-phase-label" id="heroPhaseLabel">{paused ? "PAUSED" : phaseText}{w.step && w.step.rounds>1 && <span> / Round {w.step.round}/{w.step.rounds}</span>}</div>
 
         <div className="hero-ring-wrap">
           <svg viewBox="0 0 220 220" className="hero-ring-svg">
@@ -205,13 +220,16 @@ export default function App() {
             <circle className="ring-fill"  id="heroRing" cx="110" cy="110" r="96"
               strokeDasharray="603.19" strokeDashoffset={603.19 * (1 - (duration ? remaining/duration : 0))}/>
           </svg>
-          <div className="hero-timer" id="heroDisplay">{fmt(remaining)}</div>
+          <div className={`hero-timer ${paused ? "is-paused" : ""} ${w.manual ? "rep-display" : ""}`} id="heroDisplay">{paused ? "PAUSED" : w.manual ? `${current?.reps} reps` : fmt(remaining)}</div>
           <div className="hero-subtext" id="heroSubtext">{phase === "prepare" ? "GET INTO POSITION" : phase === "work" ? current?.name.toUpperCase() : phase === "short" ? "REST UP · NEXT SET SOON" : "GREAT WORK · NEXT EXERCISE SOON"}</div>
         </div>
 
         
         <p className="next-action">Next: {nextAction}</p>
         <div className="hero-controls">
+          {w.manual && <button className="ctrl-btn ctrl-done" onClick={w.doneReps} disabled={paused}>Done ? next set</button>}
+          {(phase === "short" || phase === "long") && <button className="ctrl-btn ctrl-skip" onClick={w.extendRest}>+15s rest</button>}
+          <button className="small-button" onClick={()=>setSettings({...settings,compact:!settings.compact})}>{settings.compact ? "Show details" : "Compact view"}</button>
           <button className={`ctrl-btn ctrl-pause ${paused ? "paused" : ""}`} id="heroPauseBtn" onClick={() => togglePause()}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" id="pauseIcon" style={{display: paused ? "none" : "block"}}><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" id="resumeIcon" style={{display: paused ? "block" : "none"}}><polygon points="5,3 19,12 5,21" fill="currentColor"/></svg>
@@ -279,8 +297,9 @@ export default function App() {
     <div className="complete-inner">
       <div className="complete-icon">🏆</div>
       <div className="complete-title">Crushed It!</div>
-      <div className="complete-sub" id="completeSubText">All sets completed — outstanding work!</div>
+      <div className="complete-sub" id="completeSubText">{hadSkippedPhases ? "Session finished - includes skipped phases" : "All planned sets completed!"}</div>
       <div className="complete-stats" id="completeStats"><strong>{queue.length}</strong> exercises · <strong>{totalSets}</strong> {hadSkippedPhases ? "planned sets" : "total sets"}<br/>Total time: <strong>{fmt(elapsed)}</strong></div>
+      <CompletionExtras w={w}/>
       <button className="btn-again" onClick={() => returnToSetup()}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
         New Workout
@@ -289,6 +308,7 @@ export default function App() {
   </div>
 
   
+  {w.canUndo && !active && !complete && <div className="undo-bar" role="status"><span>Recent change</span><button className="small-button" onClick={w.undo}>Undo</button></div>}
   <div id="toast" role="status" className={toast ? "show" : ""}>{toast}</div>
 
   </>;

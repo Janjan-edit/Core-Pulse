@@ -44,3 +44,16 @@ The production build includes a web app manifest and an offline service worker. 
 ## Checks
 
 `npm test` checks storage validation, routine editing and backups, timer transitions, pause/resume, stopping, history, persistence, and React rendering with a simulated DOM. It does not replace testing device audio, fullscreen, wake lock, or installation in a real browser.
+
+## Flexible workouts and coaching
+
+- Build timed or repetition-based exercises. Repetition sets end only when you tap Done; their work duration is an estimate used by the preview and Fit my time.
+- Give consecutive exercises a matching block name and style. Warm-up/cooldown organize the routine. Circuit/superset blocks repeat using the first exercise's round count (1–10). Sets run inside each round. Set rests to zero for immediate transitions.
+- The preview shows work/rest totals and exercise order. Fit my time proposes reducing sets and then removing exercises from the end, preserving rest durations and rounds. Review and apply it to the current queue; saved routines are unchanged.
+- During rest, +15s extends only the current rest. Manual Done completes a repetition set; Skip marks the session as including skipped phases. Undo restores the last removed/cleared queue or deleted routine.
+- Choose Quiet, Essential, or Encouraging coaching. Quiet suppresses audio and vibration. Voice cues require Voice cues to be enabled. Device support and browser policies affect voice, vibration, fullscreen, and wake lock. Keep the workout tab visible for timely cues.
+- Light/dark appearance, compact workout view, and reduced motion save with your settings. System reduced-motion preferences are also respected.
+- Weekly activity uses local calendar days and the last 100 finished sessions. Session feedback and notes save automatically. Download a completion card as a PNG; it includes your note and marks skipped phases.
+- Create a share link or QR from the current queue. Routine data lives in the URL fragment; recipients review before loading it. History and notes are excluded. Long routines may exceed QR capacity; use the share link or JSON backup instead.
+
+`npm test` also checks repeated blocks, zero-rest transitions, manual sets, paused rest extensions, undo, fit-time changes, shared routine round trips, weekly totals, QR generation, card export, and compatibility with older saved data. Device features and visual layout still require real-browser testing.
